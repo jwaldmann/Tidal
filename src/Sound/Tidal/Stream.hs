@@ -59,6 +59,11 @@ import           Sound.Tidal.Version
 
 import Sound.Tidal.StreamTypes as Sound.Tidal.Stream
 
+-- | Apply a function to the control values of the query
+withQueryControls :: (ValueMap -> ValueMap) -> Signal a -> Signal a
+withQueryControls f pat = pat { query = query pat . (\(State a m) -> State a (f m))}
+
+
 data Stream = Stream {sConfig :: Config,
                       sBusses :: MVar [Int],
                       sStateMV :: MVar ValueMap,

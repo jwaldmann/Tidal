@@ -1,5 +1,6 @@
 :set -XOverloadedStrings
 :set prompt ""
+:set -fdefer-type-errors
 
 import Sound.Tidal.Context
 
