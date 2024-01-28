@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, OverloadedStrings #-}
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, OverloadedStrings, BangPatterns #-}
 
 {-
     UI.hs - Tidal's main 'user interface' functions, for transforming
@@ -45,6 +45,10 @@ import           Data.Maybe (isJust, fromJust, fromMaybe, mapMaybe)
 import qualified Data.Text as T
 import qualified Data.Map.Strict as Map
 import           Data.Bool (bool)
+import qualified Data.List as L
+import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as U
+
 
 import           Sound.Tidal.Bjorklund (bjorklund)
 import           Sound.Tidal.Core
@@ -1226,11 +1230,27 @@ runMarkov 8 [[2,3], [1,3]] 0 0
 will produce a two-state chain 8 steps long, from initial state @0@, where the
 transition probability from state 0->0 is 2/5, 0->1 is 3/5, 1->0 is 1/4, and
 1->1 is 3/4.  -}
+
 runMarkov :: Int -> [[Double]] -> Int -> Time -> [Int]
 runMarkov n tp xi seed = reverse $ (iterate (markovStep $ renorm) [xi])!! (n-1) where
   markovStep tp' xs = (fromJust $ findIndex (r <=) $ scanl1 (+) (tp'!!(head xs))) : xs where
     r = timeToRand $ seed + (fromIntegral . length) xs / fromIntegral n
   renorm = [ map (/ sum x) x | x <- tp ]
+
+runMarkov' :: Int -> [[Double]] -> Int -> Time -> [Int]
+runMarkov' n tp xi seed = take n $ map fst $ L.iterate' (markovStep $ renorm) (xi, seed + delta) where
+  markovStep tp' (x,seed) = (let (s,v) = tp' V.! x in binarySearch 0 (r * s) v , seed + delta) where
+    r = timeToRand seed
+  renorm :: V.Vector (Double, U.Vector Double)
+  renorm = V.fromList [ fmap U.fromList $ L.mapAccumL (\ a y -> let s = a+y in s `seq` (s,s)) 0 x | x <- tp ]
+  binarySearch :: Int -> Double -> U.Vector Double -> Int
+  binarySearch !off x v =
+    if U.length v == 0 then off
+    else if U.length v == 1 then off + 1
+    else let i = div (U.length v) 2
+         in  if x < v U.! i then binarySearch off x $ U.slice 0 i v
+             else binarySearch (off + i) x (U.slice i (U.length v - i) v)
+  delta = 1 / fromIntegral n
 
 {- @markovPat n xi tp@ generates a one-cycle pattern of @n@ steps in a Markov
 chain starting from state @xi@ with transition matrix @tp@. Each row of the
