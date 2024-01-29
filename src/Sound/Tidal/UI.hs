@@ -1239,10 +1239,10 @@ runMarkov n tp xi seed = reverse $ (iterate (markovStep $ renorm) [xi])!! (n-1) 
 
 runMarkov' :: Int -> [[Double]] -> Int -> Time -> [Int]
 runMarkov' n tp xi seed = take n $ map fst $ L.iterate' (markovStep $ renorm) (xi, seed + delta) where
-  markovStep tp' (x,seed) = (let (s,v) = tp' V.! x in binarySearch 0 (r * s) v , seed + delta) where
+  markovStep tp' (x,seed) = (let v = tp' V.! x in binarySearch 0 (r * U.last v) v , seed + delta) where
     r = timeToRand seed
-  renorm :: V.Vector (Double, U.Vector Double)
-  renorm = V.fromList [ fmap U.fromList $ L.mapAccumL (\ a y -> let s = a+y in s `seq` (s,s)) 0 x | x <- tp ]
+  renorm :: V.Vector (U.Vector Double)
+  renorm = V.fromList [ U.fromList $ tail $ scanl (+) 0 x | x <- tp ]
   binarySearch :: Int -> Double -> U.Vector Double -> Int
   binarySearch !off x v =
     if U.length v == 0 then off
